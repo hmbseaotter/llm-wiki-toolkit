@@ -1,0 +1,4 @@
+# Python dependency for the PDF engine (pdf-to-images / pdf-to-md).
+# home-page-moc and msword-to-pdf are stdlib-only; msword-to-pdf additionally
+# requires LibreOffice installed on the system (see README prerequisites).
+PyMuPDF>=1.24

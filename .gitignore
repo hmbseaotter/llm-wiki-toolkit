@@ -1,0 +1,7 @@
+# Workspace prompt-recording log — machine-local, not part of the toolkit
+project_prompts.txt
+
+# Python / OS cruft
+__pycache__/
+*.pyc
+.DS_Store

@@ -1,0 +1,5 @@
+# Normalize line endings by CONTENT, not by platform/editor churn.
+# Text files are stored and checked out as LF, so an editor re-saving a file
+# never shows as a phantom "modified" against an autocrlf=true CRLF expectation.
+# Change is judged on normalized content only.
+* text=auto eol=lf
