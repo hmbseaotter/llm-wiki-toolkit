@@ -38,8 +38,7 @@ python "~/.claude/skills/msword-to-pdf.py" [--out DIR] [--force] <doc|folder> ..
 - Output PDFs land next to each source (or in `--out`); the PDF is named from the source filename.
 - Collision guard: an existing `<name>.pdf` is not overwritten unless `--force` is given
   (`status: skipped_exists`) — confirm with the user before forcing.
-- Use whichever Python is available (on this machine `/c/Python314/python`; elsewhere `python`,
-  then `py -3`, then `python3`).
+- Use whichever Python launcher is available — `python`, or `py -3`, or `python3`.
 
 Each `RESULT:{…}` line gives the output PDF path; the `RESULT_SUMMARY:` gives counts and the resolved
 `soffice` path. Parse these — don't eyeball the folder. (A benign LibreOffice stderr warning,

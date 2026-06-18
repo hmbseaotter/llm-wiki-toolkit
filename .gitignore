@@ -1,5 +1,7 @@
-# Workspace prompt-recording log — machine-local, not part of the toolkit
+# Machine-local / session-transient files — never part of the toolkit
 project_prompts.txt
+resume_session.txt
+.claude/settings.local.json
 
 # Python / OS cruft
 __pycache__/

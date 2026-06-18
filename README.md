@@ -12,8 +12,8 @@ wiki, plus the maintenance skills that keep that wiki consistent. It is the **co
 - **llm-wiki-toolkit** (this repo) is the *how* — the **skills** that ingest sources into that schema
   and maintain the result.
 
-Clone both, install the skills, and you have the full system. (This is exactly the toolchain the
-`llm-wiki-fdn` knowledge base was built with.)
+Clone both, install the skills, and you have the full system — the same toolchain used to build a
+full knowledge base from real source material (PDFs, slide decks, and more).
 
 ---
 

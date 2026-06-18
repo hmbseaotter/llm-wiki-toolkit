@@ -5,9 +5,9 @@ and writes a clean Markdown file. This is not flat OCR: tables stay tables, flow
 `A → B` edges, diagram labels map to the parts they annotate, and hierarchy is preserved. Works on a
 single image or a batch.
 
-This skill is a generic workspace tool. It is independent of the LLM-wiki project (the wiki has its
-own image-synthesis rules baked into its CLAUDE.md); the two share the same philosophy but neither
-depends on the other.
+This is a general-purpose tool — it works standalone on any image, independent of any wiki. When used
+as part of an LLM wiki, the wiki keeps its own image-synthesis rules in its `CLAUDE.md`; the two share
+the same philosophy but neither depends on the other.
 
 ---
 

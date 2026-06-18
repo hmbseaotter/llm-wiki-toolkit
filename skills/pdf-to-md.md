@@ -42,9 +42,8 @@ none, ask for a path and stop. Capture any stated `--out` location so you don't 
 
 ## STEP 2 — Ensure the engine can run
 
-Same engine as `/pdf-to-images`; it self-installs **PyMuPDF** on first use. Use whichever Python is
-available (on this machine `/c/Python314/python`; elsewhere try `python`, then `py -3`, then
-`python3`).
+Same engine as `/pdf-to-images`; it self-installs **PyMuPDF** on first use. Use whichever Python
+launcher is available — `python`, or `py -3`, or `python3`.
 
 ## STEP 3 — Run the engine in `md` mode
 

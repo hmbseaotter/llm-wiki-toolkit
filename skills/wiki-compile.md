@@ -1,7 +1,7 @@
 # Wiki compile — build deferred causal-chains + lint + regen MOC (the finishing step)
 
-The closing step that makes a round of changes to a schema-wiki (llm-wiki-fdn, compounding-llm-wiki,
-or any wiki using the same `CLAUDE.md` schema) **fully usable**. Ingestion runs on a cheaper model
+The closing step that makes a round of changes to an LLM wiki — any wiki built on the
+`compounding-llm-wiki` schema (its `CLAUDE.md`) — **fully usable**. Ingestion runs on a cheaper model
 that *defers* the heavy reasoning — it logs `Causal-chain candidates` in `log.md` instead of building
 them — and lint is periodic. This skill drains that backlog: it **compiles** the synthesized layer
 (builds the warranted `causal-chain` pages), **lints** the whole wiki, and **regenerates** the MOC.
@@ -124,9 +124,9 @@ Parse its `RESULT:{…}` line.
 - Append two `log.md` entries (append-only): `## [ts] causal-chain | compile pass (…)` and
   `## [ts] lint | full lint pass (…)`, recording the model that ran, the triage decisions, and
   every lint finding/fix.
-- Commit and push per the workspace Git Safety rules. If the commit added **new** raw binaries, run
-  `git lfs push --all origin` first (see the wiki LFS note); a chains+lint+MOC compile is normally
-  text-only, so a plain `git push` suffices.
+- Commit and push following your project's normal git practice. If the wiki tracks raw binaries with
+  Git LFS and this commit added **new** ones, run `git lfs push --all origin` first; a chains+lint+MOC
+  compile is normally text-only, so a plain `git push` suffices.
 
 ## STEP 8 — Report
 

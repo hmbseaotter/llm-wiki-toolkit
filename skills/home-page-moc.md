@@ -23,9 +23,8 @@ python "~/.claude/skills/home-page-moc.py" --root <wiki-root> [--title "..."]
 - `--root` is the wiki root (the folder containing `wiki/`, `index.md`, `log.md`). Defaults to the
   current directory.
 - `--title` overrides the H1. By default the title is derived from `index.md`'s H1 (e.g.
-  `# FDN Wiki — Index` → `# FDN Wiki — Map of Content`).
-- Use whichever Python is available (on this machine `/c/Python314/python`; elsewhere `python`, then
-  `py -3`, then `python3`).
+  `# My Wiki — Index` → `# My Wiki — Map of Content`).
+- Use whichever Python launcher is available — `python`, or `py -3`, or `python3`.
 
 It prints one `RESULT:{…}` JSON line with the output path and counts (`pages`, `sections`,
 `mirrors`). Parse that — don't eyeball the file.

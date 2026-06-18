@@ -14,7 +14,7 @@ embedded next to its text.
 > **`/pdf-to-md`** skill — which has a deterministic fail-safe that renders anyway if it detects any
 > graphic-layer content. See "What happens for different PDF types" below.
 
-This is a **generic workspace tool**. It is independent of the LLM-wiki projects: it assigns no
+This is a **general-purpose tool** — independent of any wiki: it assigns no
 catalog IDs and knows nothing about any `raw/` folder. It produces a clean package that a human (or
 a wiki's acquire step) can drop into `raw/` and rename to `NNNN_<slug>` *there*. Keeping ID
 assignment out of this skill preserves the wiki's "assign once, freeze forever" contract.
@@ -63,8 +63,8 @@ output location.
 ## STEP 2 — Ensure the engine can run
 
 The engine self-installs **PyMuPDF** on first use, so normally you just run it. Use whichever Python
-is available (on this machine that is `/c/Python314/python`; elsewhere try `python`, then `py -3`,
-then `python3`). PyMuPDF needs **no** external binaries (no Ghostscript/poppler).
+launcher is available — `python`, or `py -3`, or `python3`. PyMuPDF needs **no** external binaries
+(no Ghostscript/poppler).
 
 ## STEP 3 — Run the engine
 
