@@ -1,4 +1,8 @@
-# Python dependency for the PDF engine (pdf-to-images / pdf-to-md).
+# Python dependencies for the toolkit engines.
 # home-page-moc and msword-to-pdf are stdlib-only; msword-to-pdf additionally
 # requires LibreOffice installed on the system (see README prerequisites).
+#
+# PyMuPDF      — PDF rasterization/extraction (pdf-to-images / pdf-to-md)
+# markdownify  — HTML->Markdown conversion (fetch-substack-archive)
 PyMuPDF>=1.24
+markdownify>=0.11

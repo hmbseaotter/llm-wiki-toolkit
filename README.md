@@ -32,6 +32,7 @@ flowchart LR
   A -->|pdf-to-images / pdf-to-md| R[(raw/ packages)]
   B -->|msword-to-pdf| A
   C -->|url-to-md / deepwiki| R
+  S[Substack publication] -->|fetch-substack-archive| R
   R -->|ingest per the schema| W[wiki pages]
   W -->|wiki-compile: causal-chains + lint| W
   W -->|home-page-moc| MOC[home-page MOC]
@@ -49,6 +50,7 @@ flowchart LR
 | `/msword-to-pdf` | `msword-to-pdf.md` + `.py` | Convert `.doc/.docx/.rtf/.odt` to PDF via LibreOffice headless, so Word docs feed the same pipeline as PDFs. |
 | `/url-to-md` | `url-to-md.md` | Download any URL as a self-contained folder: clean markdown + images with relative links. *(Requires Firecrawl — see below.)* |
 | `/deepwiki` | `deepwiki.md` | Fetch a URL, digest it into a structured summary, and answer follow-up questions (GitHub repos auto-route to DeepWiki). *(Requires Firecrawl.)* |
+| `/fetch-substack-archive` | `fetch-substack-archive.md` + `.py` | Download a **whole Substack publication's** back-catalogue as clean, self-contained Markdown (one `.md` per post, chrome stripped, in-content images kept, provenance frontmatter). Uses Substack's JSON API — **no Firecrawl**; resumable + rate-limit-safe. *(Requires `markdownify`.)* |
 | `/home-page-moc` | `home-page-moc.md` + `.py` | (Re)generate the wiki's Obsidian Map of Content (`home-page.md`): a deterministic A–Z index of every page. Stdlib-only. |
 | `/wiki-compile` | `wiki-compile.md` | The **finishing step**: build the deferred causal-chain pages, run the full lint, and regenerate the MOC. Run after a round of ingestion or after manual edits. |
 
@@ -60,6 +62,8 @@ flowchart LR
 - **Python 3.9+** — for the `.py` engines.
 - **[PyMuPDF](https://pymupdf.readthedocs.io/)** — the PDF rasterization/extraction engine used by
   `/pdf-to-images` and `/pdf-to-md`. Installed via `requirements.txt` below.
+- **[markdownify](https://pypi.org/project/markdownify/)** — HTML→Markdown converter used by
+  `/fetch-substack-archive`. Pure Python (no pandoc). Installed via `requirements.txt` below.
 - **LibreOffice** *(optional)* — only for `/msword-to-pdf`. MS Word itself is **not** required.
   `winget install --id TheDocumentFoundation.LibreOffice` (Windows), or your platform's package manager.
 - **Firecrawl** *(optional)* — only for `/url-to-md` and `/deepwiki`. See **[Web sourcing](#web-sourcing-with-firecrawl-optional)**.
@@ -117,7 +121,9 @@ two skills won't work (the rest of the toolkit, which works on local files, need
    If that produces a clean `test.md`, `/url-to-md` and `/deepwiki` are ready.
 
 If you'd rather not set this up, skip these two skills — `/pdf-to-images`, `/pdf-to-md`, `/image-to-md`,
-`/msword-to-pdf`, `/home-page-moc`, and `/wiki-compile` all work without Firecrawl.
+`/msword-to-pdf`, `/fetch-substack-archive`, `/home-page-moc`, and `/wiki-compile` all work without
+Firecrawl. (`/fetch-substack-archive` sources from the web too, but via Substack's own JSON API, so it
+needs `markdownify` rather than Firecrawl.)
 
 ---
 
