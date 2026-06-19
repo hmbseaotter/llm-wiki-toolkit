@@ -76,6 +76,24 @@ python "~/.claude/skills/fetch-substack-archive.py" <publication> \
 | `--free-only` | skip paywalled posts entirely (`audience != everyone`) — don't even fetch their previews |
 | `--ledger PATH` | resume-ledger path (default `<out>/_done.json`). **Point at a durable location** (outside scratch staging) for an ongoing/scheduled watch, so the "what's been fetched" memory survives staging cleanup |
 | `--manifest PATH` | manifest output path (default `<out>/_manifest.json`) |
+| `--cache-dir DIR` | persist each post's **pristine raw JSON** (`<DIR>/<slug>.json`, the pre-transform `body_html` + post metadata) so the Markdown is a *re-derivable product* of cached bytes |
+| `--from-cache` | re-derive Markdown from `--cache-dir` with **zero network**. Use after fixing the transform (or to reproduce a past corpus) instead of re-pulling — fast, and immune to the live site drifting (authors edit/delete/paywall posts) |
+
+### Why cache the pristine source (the `--cache-dir` layer)
+
+The Markdown in your `raw/` is a *derived* product of a transform (strip widgets → HTML-to-MD →
+frontmatter). If that transform has a bug — or you improve it later — you'd otherwise have to
+re-fetch every post to regenerate. Caching the **raw API JSON before the transform** puts the
+redundancy at the right seam (fetched bytes → derived Markdown, not two copies of the Markdown), so:
+
+- a transform fix re-runs in **seconds** via `--from-cache` (no network, no rate-limit) instead of a
+  full re-pull;
+- you get a **reproducible** corpus insulated from the live site changing under you, and true
+  byte-level **provenance** of exactly what you synthesized from.
+
+It mirrors the LLM-wiki schema's `raw/_master/<file>.pdf` idea (keep the fidelity master, derive the
+rest) applied to web sources. Cheap for text (~50 KB/post). The scheduled `corpus-watch` passes
+`--cache-dir` automatically.
 | `--delay SECS` | base politeness delay between posts (default 1.2 — see rate-limit note) |
 | `--limit N` | only the newest N posts (validation/test runs) |
 | `--force` | re-download even posts already in the ledger |

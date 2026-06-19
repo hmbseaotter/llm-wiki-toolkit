@@ -129,25 +129,37 @@ def byline(post):
 
 
 # ---------- widget stripper ----------
+# Void elements have NO end tag. They must never change skip depth, or a void tag
+# (e.g. <input> inside a subscribe-widget <form>) would raise skip_depth with no
+# matching close, leaving the stripper stuck in skip-mode and dropping the entire
+# rest of the article. (This was a real truncation bug.)
+VOID_TAGS = {"area", "base", "br", "col", "embed", "hr", "img", "input", "keygen",
+             "link", "meta", "param", "source", "track", "wbr"}
+
 class _WidgetStripper(HTMLParser):
     def __init__(self):
         super().__init__(convert_charrefs=False)
-        self.out = []; self.skip_depth = 0; self.stack = []
+        self.out = []; self.skip_depth = 0
     def _blocked(self, attrs):
         cls = dict(attrs).get("class", "") or ""
         return any(tok in cls for tok in BLOCK_CLASS_TOKENS)
     def handle_starttag(self, tag, attrs):
+        if tag in VOID_TAGS:                       # void: no end tag, never touch depth
+            if not self.skip_depth and not self._blocked(attrs):
+                self.out.append(self.get_starttag_text())
+            return
         if self.skip_depth:
-            self.skip_depth += 1; self.stack.append(tag); return
+            self.skip_depth += 1; return
         if self._blocked(attrs):
-            self.skip_depth = 1; self.stack.append(tag); return
-        self.stack.append(tag); self.out.append(self.get_starttag_text())
+            self.skip_depth = 1; return
+        self.out.append(self.get_starttag_text())
     def handle_startendtag(self, tag, attrs):
         if self.skip_depth or self._blocked(attrs): return
         self.out.append(self.get_starttag_text())
     def handle_endtag(self, tag):
-        if self.stack: self.stack.pop()
-        if self.skip_depth: self.skip_depth -= 1; return
+        if tag in VOID_TAGS: return                # stray void end tag: ignore
+        if self.skip_depth:
+            self.skip_depth -= 1; return
         self.out.append(f"</{tag}>")
     def handle_data(self, d):
         if not self.skip_depth: self.out.append(d)
@@ -177,10 +189,29 @@ def enumerate_archive(base, delay=0.4):
     return sorted(uniq, key=lambda x: x.get("post_date", ""))
 
 
-# ---------- one post ----------
-def process(base, entry, out, prefix, author_override, want_date, always_folder):
-    slug = entry["slug"]; date = (entry.get("post_date") or entry.get("date") or "")[:10]
+# ---------- source cache (pristine pre-transform bytes) ----------
+def fetch_post(base, slug, cache_dir=None, from_cache=False):
+    """Return the post's raw JSON (incl. body_html). With cache_dir set, persist it so the
+    markdown becomes a re-derivable product of cached bytes; with from_cache, read it back
+    instead of hitting the network (zero requests, reproducible, drift-proof)."""
+    cache_path = os.path.join(cache_dir, slug + ".json") if cache_dir else None
+    if from_cache:
+        if not cache_path or not os.path.exists(cache_path):
+            raise FileNotFoundError(f"no cached source for slug '{slug}' in {cache_dir}")
+        return json.load(open(cache_path, encoding="utf-8"))
     post = get_json(f"{base}/api/v1/posts/{urllib.parse.quote(slug)}")
+    post["_fetched_at"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    if cache_path:
+        os.makedirs(os.path.dirname(os.path.abspath(cache_path)), exist_ok=True)
+        json.dump(post, open(cache_path, "w", encoding="utf-8"), ensure_ascii=False)
+    return post
+
+
+# ---------- one post ----------
+def process(base, entry, out, prefix, author_override, want_date, always_folder,
+            cache_dir=None, from_cache=False):
+    slug = entry["slug"]; date = (entry.get("post_date") or entry.get("date") or "")[:10]
+    post = fetch_post(base, slug, cache_dir, from_cache)
     body = strip_widgets(post.get("body_html") or "")
     title = post.get("title") or entry.get("title") or slug
     subtitle = post.get("subtitle") or ""
@@ -230,7 +261,7 @@ def process(base, entry, out, prefix, author_override, want_date, always_folder)
     markdown = re.sub(r"\n{3,}", "\n\n",
                       md(body, heading_style="ATX", strip=["script", "style"]).strip())
 
-    retrieved = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    retrieved = post.get("_fetched_at") or datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     fm = ["---", f"source_url: {url}", f"title: {yaml_escape(title)}"]
     if subtitle: fm.append(f"subtitle: {yaml_escape(subtitle)}")
     fm += [f"author: {yaml_escape(author)}", f"post_date: {date}"]
@@ -275,6 +306,11 @@ def main():
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--list-only", action="store_true")
     ap.add_argument("--force", action="store_true")
+    ap.add_argument("--cache-dir", help="persist each post's pristine raw JSON here (the "
+                    "pre-transform source), so the markdown is a re-derivable product of cached bytes")
+    ap.add_argument("--from-cache", action="store_true",
+                    help="re-derive markdown from --cache-dir with NO network (reproducible; "
+                         "use after fixing the transform, instead of re-pulling)")
     a = ap.parse_args()
 
     base = resolve_base(a.publication)
@@ -282,9 +318,24 @@ def main():
     os.makedirs(out, exist_ok=True)
     ledger_path = a.ledger or os.path.join(out, "_done.json")
     manifest_path = a.manifest or os.path.join(out, "_manifest.json")
-    print(f"publication: {base}\noutput dir : {out}\nledger     : {ledger_path}")
+    if a.from_cache and not a.cache_dir:
+        sys.exit("--from-cache requires --cache-dir")
+    print(f"publication: {base}\noutput dir : {out}\nledger     : {ledger_path}"
+          + (f"\ncache dir  : {a.cache_dir}" + ("  (re-derive, no network)" if a.from_cache else "")
+             if a.cache_dir else ""))
 
-    man = enumerate_archive(base)
+    if a.from_cache:
+        # Build the work list from cached source JSON — zero network.
+        man = []
+        for fn in sorted(os.listdir(a.cache_dir)):
+            if not fn.endswith(".json"): continue
+            p = json.load(open(os.path.join(a.cache_dir, fn), encoding="utf-8"))
+            man.append({"post_date": p.get("post_date"), "audience": p.get("audience"),
+                        "title": p.get("title"), "slug": p.get("slug") or fn[:-5],
+                        "canonical_url": p.get("canonical_url")})
+        man.sort(key=lambda x: x.get("post_date") or "")
+    else:
+        man = enumerate_archive(base)
     mdir = os.path.dirname(os.path.abspath(manifest_path))
     if mdir: os.makedirs(mdir, exist_ok=True)
     json.dump([{"date": (p.get("post_date") or "")[:10], "audience": p.get("audience"),
@@ -292,8 +343,9 @@ def main():
                 "canonical_url": p.get("canonical_url")} for p in man],
               open(manifest_path, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
     nonfree = [p for p in man if p.get("audience") != "everyone"]
-    print(f"posts found: {len(man)}  ({(man[0].get('post_date') or '')[:10]} -> "
-          f"{(man[-1].get('post_date') or '')[:10]})  non-public: {len(nonfree)}")
+    src = "cached" if a.from_cache else "found"
+    print(f"posts {src}: {len(man)}  ({(man[0].get('post_date') or '')[:10] if man else '-'} -> "
+          f"{(man[-1].get('post_date') or '')[:10] if man else '-'})  non-public: {len(nonfree)}")
     print(f"manifest written: {manifest_path}  (last/newest = bottom)")
     if a.list_only:
         print("RESULT_SUMMARY:" + json.dumps({"publication": base, "found": len(man),
@@ -303,12 +355,15 @@ def main():
     work = man[-a.limit:] if a.limit else man
     if a.free_only:
         work = [e for e in work if e.get("audience") == "everyone"]
-    done = set() if a.force else load_done(ledger_path)
+    # from-cache re-derives everything; network mode honors the resume ledger.
+    done = set() if (a.force or a.from_cache) else load_done(ledger_path)
+    delay = 0 if a.from_cache else a.delay
     ok = fail = skipped = imgs = 0; new_items = []
     for i, e in enumerate(work, 1):
         if e["slug"] in done: skipped += 1; continue
         try:
-            r = process(base, e, out, a.prefix, a.author, a.date, a.always_folder)
+            r = process(base, e, out, a.prefix, a.author, a.date, a.always_folder,
+                        a.cache_dir, a.from_cache)
             done.add(e["slug"]); save_done(ledger_path, done); ok += 1
             if r["images"]: imgs += 1
             new_items.append({"date": (e.get("post_date") or "")[:10],
@@ -318,7 +373,7 @@ def main():
             print(f"[{i:>4}/{len(work)}] {r['path']}{flag}{warn}")
         except Exception as ex:
             fail += 1; print(f"[{i:>4}/{len(work)}] FAIL {e['slug']}: {ex}")
-        time.sleep(a.delay)
+        time.sleep(delay)
 
     print(f"\n==== SUMMARY ====\ndownloaded: {ok}  | with images: {imgs}  | "
           f"skipped(done): {skipped}  | failed: {fail}")
