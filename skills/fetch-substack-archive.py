@@ -250,12 +250,14 @@ def process(base, entry, out, prefix, author_override, want_date, always_folder)
 
 
 # ---------- ledger ----------
-def load_done(out):
-    try: return set(json.load(open(os.path.join(out, "_done.json"), encoding="utf-8")))
+def load_done(path):
+    try: return set(json.load(open(path, encoding="utf-8")))
     except Exception: return set()
 
-def save_done(out, done):
-    json.dump(sorted(done), open(os.path.join(out, "_done.json"), "w", encoding="utf-8"), indent=0)
+def save_done(path, done):
+    d = os.path.dirname(os.path.abspath(path))
+    if d: os.makedirs(d, exist_ok=True)
+    json.dump(sorted(done), open(path, "w", encoding="utf-8"), indent=0)
 
 
 def main():
@@ -264,6 +266,11 @@ def main():
     ap.add_argument("--out"); ap.add_argument("--prefix", default="")
     ap.add_argument("--author"); ap.add_argument("--no-date", dest="date", action="store_false")
     ap.add_argument("--always-folder", action="store_true")
+    ap.add_argument("--free-only", action="store_true",
+                    help="skip paywalled posts entirely (audience != everyone)")
+    ap.add_argument("--ledger", help="resume-ledger path (default <out>/_done.json); point at a "
+                                     "durable location for an ongoing watch so it survives staging cleanup")
+    ap.add_argument("--manifest", help="manifest output path (default <out>/_manifest.json)")
     ap.add_argument("--delay", type=float, default=1.2)
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--list-only", action="store_true")
@@ -273,30 +280,39 @@ def main():
     base = resolve_base(a.publication)
     out = a.out or os.path.abspath(f"{subdomain_of(base)}-archive")
     os.makedirs(out, exist_ok=True)
-    print(f"publication: {base}\noutput dir : {out}")
+    ledger_path = a.ledger or os.path.join(out, "_done.json")
+    manifest_path = a.manifest or os.path.join(out, "_manifest.json")
+    print(f"publication: {base}\noutput dir : {out}\nledger     : {ledger_path}")
 
     man = enumerate_archive(base)
+    mdir = os.path.dirname(os.path.abspath(manifest_path))
+    if mdir: os.makedirs(mdir, exist_ok=True)
     json.dump([{"date": (p.get("post_date") or "")[:10], "audience": p.get("audience"),
                 "title": p.get("title"), "slug": p.get("slug"),
                 "canonical_url": p.get("canonical_url")} for p in man],
-              open(os.path.join(out, "_manifest.json"), "w", encoding="utf-8"),
-              indent=1, ensure_ascii=False)
+              open(manifest_path, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
     nonfree = [p for p in man if p.get("audience") != "everyone"]
     print(f"posts found: {len(man)}  ({(man[0].get('post_date') or '')[:10]} -> "
           f"{(man[-1].get('post_date') or '')[:10]})  non-public: {len(nonfree)}")
-    print(f"manifest written: {os.path.join(out, '_manifest.json')}  (last/newest = bottom)")
+    print(f"manifest written: {manifest_path}  (last/newest = bottom)")
     if a.list_only:
+        print("RESULT_SUMMARY:" + json.dumps({"publication": base, "found": len(man),
+              "nonfree": len(nonfree), "downloaded": 0, "list_only": True}))
         return
 
     work = man[-a.limit:] if a.limit else man
-    done = set() if a.force else load_done(out)
-    ok = fail = skipped = imgs = 0
+    if a.free_only:
+        work = [e for e in work if e.get("audience") == "everyone"]
+    done = set() if a.force else load_done(ledger_path)
+    ok = fail = skipped = imgs = 0; new_items = []
     for i, e in enumerate(work, 1):
         if e["slug"] in done: skipped += 1; continue
         try:
             r = process(base, e, out, a.prefix, a.author, a.date, a.always_folder)
-            done.add(e["slug"]); save_done(out, done); ok += 1
+            done.add(e["slug"]); save_done(ledger_path, done); ok += 1
             if r["images"]: imgs += 1
+            new_items.append({"date": (e.get("post_date") or "")[:10],
+                              "title": e.get("title"), "path": r["path"]})
             flag = f"  [{r['images']} img]" if r["images"] else ""
             warn = "  <PREVIEW?>" if (r["audience"] and r["audience"] != "everyone") else ""
             print(f"[{i:>4}/{len(work)}] {r['path']}{flag}{warn}")
@@ -307,7 +323,10 @@ def main():
     print(f"\n==== SUMMARY ====\ndownloaded: {ok}  | with images: {imgs}  | "
           f"skipped(done): {skipped}  | failed: {fail}")
     if fail:
-        print("Re-run the same command to retry failures (resumable via _done.json).")
+        print("Re-run the same command to retry failures (resumable via the ledger).")
+    print("RESULT_SUMMARY:" + json.dumps({"publication": base, "found": len(man),
+          "nonfree": len(nonfree), "downloaded": ok, "with_images": imgs,
+          "skipped": skipped, "failed": fail, "free_only": a.free_only, "new": new_items}))
 
 
 if __name__ == "__main__":

@@ -73,9 +73,16 @@ python "~/.claude/skills/fetch-substack-archive.py" <publication> \
 | `--author NAME` | author for frontmatter (default: **auto-detected from the post byline**) |
 | `--no-date` | omit `YYYY-MM-DD` from filenames (default: **include it** — sorts chronologically and disambiguates same-day posts) |
 | `--always-folder` | every post gets its own folder (default: flat `.md`, folder **only** when a post has kept in-content images) |
+| `--free-only` | skip paywalled posts entirely (`audience != everyone`) — don't even fetch their previews |
+| `--ledger PATH` | resume-ledger path (default `<out>/_done.json`). **Point at a durable location** (outside scratch staging) for an ongoing/scheduled watch, so the "what's been fetched" memory survives staging cleanup |
+| `--manifest PATH` | manifest output path (default `<out>/_manifest.json`) |
 | `--delay SECS` | base politeness delay between posts (default 1.2 — see rate-limit note) |
 | `--limit N` | only the newest N posts (validation/test runs) |
-| `--force` | re-download even posts already in the `_done.json` ledger |
+| `--force` | re-download even posts already in the ledger |
+
+The run ends with a machine-readable `RESULT_SUMMARY:{…}` JSON line (publication, found, nonfree,
+downloaded, skipped, failed, and a `new` list of `{date,title,path}`) — parse that for automation
+rather than scraping the per-post log lines.
 
 **Filename:** `<prefix><YYYY-MM-DD->-<title-slug>.md`. **Layout default:** flat `.md` files; a post
 with genuine in-content images becomes a folder (`<name>/article.md` + `images/`) so a folder
