@@ -85,7 +85,8 @@ The skills must live in your Claude Code skills directory, `~/.claude/skills/`.
 ```
 
 The installer copies every `skills/*.md` and `skills/*.py` into `~/.claude/skills/`. Re-run it after
-you `git pull` updates. Then install the Python engine dependency:
+you `git pull` updates. Then install the Python engine dependency (Windows: `pip`; macOS/Linux:
+`pip3`):
 
 ```bash
 pip install -r requirements.txt
