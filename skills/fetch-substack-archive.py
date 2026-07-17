@@ -203,7 +203,7 @@ def fetch_post(base, slug, cache_dir=None, from_cache=False):
     post["_fetched_at"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     if cache_path:
         os.makedirs(os.path.dirname(os.path.abspath(cache_path)), exist_ok=True)
-        json.dump(post, open(cache_path, "w", encoding="utf-8"), ensure_ascii=False)
+        json.dump(post, open(cache_path, "w", encoding="utf-8", newline="\n"), ensure_ascii=False)
     return post
 
 
@@ -269,7 +269,7 @@ def process(base, entry, out, prefix, author_override, want_date, always_folder,
         fm.append(f"audience: {audience}   # NOTE: non-public — body may be a preview only")
     fm += [f"retrieved: {retrieved}", f"engine: {ENGINE}", "---", ""]
     header = f"# {title}\n\n" + (f"*{subtitle}*\n\n" if subtitle else "") + f"Source: {url}\n\n"
-    with open(mdpath, "w", encoding="utf-8") as f:
+    with open(mdpath, "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(fm) + header + markdown + "\n")
 
     for realu, dest in img_jobs:
@@ -288,7 +288,7 @@ def load_done(path):
 def save_done(path, done):
     d = os.path.dirname(os.path.abspath(path))
     if d: os.makedirs(d, exist_ok=True)
-    json.dump(sorted(done), open(path, "w", encoding="utf-8"), indent=0)
+    json.dump(sorted(done), open(path, "w", encoding="utf-8", newline="\n"), indent=0)
 
 
 def main():
@@ -341,7 +341,7 @@ def main():
     json.dump([{"date": (p.get("post_date") or "")[:10], "audience": p.get("audience"),
                 "title": p.get("title"), "slug": p.get("slug"),
                 "canonical_url": p.get("canonical_url")} for p in man],
-              open(manifest_path, "w", encoding="utf-8"), indent=1, ensure_ascii=False)
+              open(manifest_path, "w", encoding="utf-8", newline="\n"), indent=1, ensure_ascii=False)
     nonfree = [p for p in man if p.get("audience") != "everyone"]
     src = "cached" if a.from_cache else "found"
     print(f"posts {src}: {len(man)}  ({(man[0].get('post_date') or '')[:10] if man else '-'} -> "
