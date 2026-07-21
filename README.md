@@ -100,6 +100,36 @@ That's it. In Claude Code, invoke a skill by name — e.g. `/pdf-to-images deck.
 > skill by name. If a `/<name>` doesn't auto-resolve, just tell the agent: *"run the `<name>` skill"* —
 > it will read `~/.claude/skills/<name>.md` and follow it.
 
+### Installing the QA cores into a wiki
+
+Two files are **not** skills and do not belong in `~/.claude/skills/`: `wiki-tools/contradiction_qa.py`
+and `wiki-tools/structure_qa.py`. They live inside each wiki repo's `tools/`, because they are run
+from the wiki root and are committed with it — so every clone carries its own QA, with no dependency
+on the toolkit being installed.
+
+| Core | Answers |
+|---|---|
+| `contradiction_qa.py` | which claim-level conflicts are open, by severity, and which are ageing |
+| `structure_qa.py` | where the repo violates its own schema: duplicate slugs, index parity, stale pending-pointers, broken image links, out-of-vocabulary direction tokens |
+
+```powershell
+./install-wiki-tools.ps1                    # into the current directory's wiki
+./install-wiki-tools.ps1 -WikiRoot D:\path\to\wiki
+./install-wiki-tools.ps1 -Check             # report drift, change nothing (exit 1 if any)
+```
+```bash
+./install-wiki-tools.sh                     # into the current directory's wiki
+./install-wiki-tools.sh /path/to/wiki
+./install-wiki-tools.sh --check /path/to/wiki
+```
+
+**This exists because copying does not hold.** These cores were hand-copied into each wiki once, and
+by 2026-07-21 they had silently diverged by ~70 lines — one wiki's copy even documented a pipeline
+that did not exist in it. Per-file the installer reports `NEW` / `UPDATED (target had drifted)` /
+`unchanged`, so a local edit is named rather than silently overwritten, and `--check` exits non-zero
+when anything is out of date — usable as a drift alarm. Re-run it after `git pull` and every wiki
+tracks one upstream. It refuses any directory without `CLAUDE.md` and `wiki/`.
+
 ---
 
 ## Web sourcing with Firecrawl (optional)

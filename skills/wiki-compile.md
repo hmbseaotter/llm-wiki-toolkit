@@ -108,11 +108,25 @@ forward link.
 
 ## STEP 5 — Full lint pass
 
-Run the schema's **Lint workflow** in full: orphans, missing pages, near-miss slugs, stale
-pending-pointers, contradictions (apply the contradiction protocol), causal-chain gaps, missing
-direction labels, EXTERNAL-unverified links, stale sources, broken asset links, **unreferenced source
-images** (open flagged images per Hard Rule 9 — decide decorative vs dropped-illustrative), thin
-pages, missing cross-references. Fix what is fixable; log the rest.
+**Run the wiki's QA cores first if it ships them**, rather than hand-rolling the equivalent greps.
+They are stdlib-only, cost no context, and their output is what any pipeline and pre-commit gate act
+on — so the lint can never disagree with the automation:
+
+```bash
+python tools/structure_qa.py       # duplicate slugs, index parity both ways, stale pending-pointers,
+                                   # broken image links, out-of-vocabulary direction tokens
+python tools/contradiction_qa.py   # open contradictions by severity + the soft/scope aging report
+```
+
+Both are optional — skip whichever is absent. Then run the rest of the schema's **Lint workflow**:
+orphans, near-miss slugs, causal-chain gaps, EXTERNAL-unverified links, stale sources, **unreferenced
+source images** (open flagged images per Hard Rule 9 — decide decorative vs dropped-illustrative),
+thin pages, missing cross-references. Fix what is fixable; log the rest.
+
+**A structural finding needs a home.** A wiki with no ingest pipeline has no email channel at all, so
+anything `structure_qa` reports must be fixed in this pass or written into the `log.md` lint entry as
+explicitly OPEN with the reason — never mentioned in passing. In one wiki a duplicate slug sat unseen
+for 14 days because it was reported to `log.md` and nowhere else.
 
 ## STEP 6 — Regenerate the MOC
 
