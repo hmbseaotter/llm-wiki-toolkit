@@ -132,10 +132,26 @@ on, so they follow the delta instead.
   so anything `structure_qa` reports must be fixed in this pass or written into the `log.md` lint
   entry as explicitly OPEN with the reason — never mentioned in passing. In one wiki a duplicate slug
   sat unseen for 14 days because it was reported to `log.md` and nowhere else.
+- **PENDING contradiction assessments — repo-wide, never scoped, and yours alone to write.** Where a
+  wiki's ingest step runs on a cheaper model, that model should only DETECT a conflict: record both
+  claims verbatim with a *provisional* severity and leave
+  `LLM assessment: PENDING — … awaiting <opus model> review`. The schema routes the assessment to the
+  reasoning model because its value depends on reasoning quality. So:
+
+  ```bash
+  grep -rn "LLM assessment: PENDING" wiki/
+  ```
+
+  Write a real assessment for every hit, then **confirm or OVERRIDE the provisional severity** against
+  the schema's test (`hard` only when the two claims cannot both be true; two studies disagreeing is
+  `soft`), and set `Last reviewed: <your model>, <ts>`. An escalation to `hard` blocks an automated
+  commit and summons the user — that is correct, and is the whole reason this step exists. A PENDING
+  assessment anywhere in the wiki is unfinished work, so this one ignores the delta scoping below.
 - **Reasoning-heavy checks, scoped to the STEP 2 delta** (the changed set + its 1st/2nd-degree
-  `[[wikilink]]` neighbours): contradictions (apply the contradiction protocol), causal-chain gaps,
-  thin pages, missing cross-references. Run these **across the whole wiki only** when the user asked
-  for a full lint, or at a milestone such as just after a large bootstrap ingest.
+  `[[wikilink]]` neighbours): contradictions already assessed (re-check only if the delta touches
+  them), causal-chain gaps, thin pages, missing cross-references. Run these **across the whole wiki
+  only** when the user asked for a full lint, or at a milestone such as just after a large bootstrap
+  ingest.
 
 Fix what is fixable; log the rest, recording which scope ran.
 
