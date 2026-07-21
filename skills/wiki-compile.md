@@ -106,27 +106,38 @@ forward link.
 - Resolve any `Opus-pass candidate` / `causal-chain candidate` pending notes left in concept pages —
   point them at the built page (or record the deliberate decision to keep a chain inline).
 
-## STEP 5 — Full lint pass
+## STEP 5 — Lint pass (scoped per the STEP 2 triage)
 
-**Run the wiki's QA cores first if it ships them**, rather than hand-rolling the equivalent greps.
-They are stdlib-only, cost no context, and their output is what any pipeline and pre-commit gate act
-on — so the lint can never disagree with the automation:
+Run the schema's **Lint workflow**, honouring its **Scope** rule (incremental by default — see the
+schema's `### Scope` subsection). The split matters: the cheap checks are cheap enough to run over
+everything every time, while the expensive ones are what a full-wiki sweep would waste model budget
+on, so they follow the delta instead.
 
-```bash
-python tools/structure_qa.py       # duplicate slugs, index parity both ways, stale pending-pointers,
-                                   # broken image links, out-of-vocabulary direction tokens
-python tools/contradiction_qa.py   # open contradictions by severity + the soft/scope aging report
-```
+- **Deterministic checks, repo-wide** — run the wiki's own QA cores FIRST if it ships them, rather
+  than hand-rolling the equivalent greps (they are stdlib-only, take no context, and their output is
+  the same one any pipeline and pre-commit gate act on, so the lint can never disagree with the
+  automation):
 
-Both are optional — skip whichever is absent. Then run the rest of the schema's **Lint workflow**:
-orphans, near-miss slugs, causal-chain gaps, EXTERNAL-unverified links, stale sources, **unreferenced
-source images** (open flagged images per Hard Rule 9 — decide decorative vs dropped-illustrative),
-thin pages, missing cross-references. Fix what is fixable; log the rest.
+  ```bash
+  python tools/structure_qa.py       # duplicate slugs, index parity both ways, stale pending-pointers,
+                                     # broken image links, out-of-vocabulary direction tokens
+  python tools/contradiction_qa.py   # open contradictions by severity + the soft/scope aging report
+  ```
 
-**A structural finding needs a home.** A wiki with no ingest pipeline has no email channel at all, so
-anything `structure_qa` reports must be fixed in this pass or written into the `log.md` lint entry as
-explicitly OPEN with the reason — never mentioned in passing. In one wiki a duplicate slug sat unseen
-for 14 days because it was reported to `log.md` and nowhere else.
+  Both are optional — skip whichever is absent (older wikis may ship neither). Then cover what they do
+  not: orphans, near-miss slugs, EXTERNAL-unverified links, stale sources, **unreferenced source
+  images** (open flagged images per Hard Rule 9 — decide decorative vs dropped-illustrative).
+
+  **A structural finding needs a home.** A wiki with no ingest pipeline has no email channel at all,
+  so anything `structure_qa` reports must be fixed in this pass or written into the `log.md` lint
+  entry as explicitly OPEN with the reason — never mentioned in passing. In one wiki a duplicate slug
+  sat unseen for 14 days because it was reported to `log.md` and nowhere else.
+- **Reasoning-heavy checks, scoped to the STEP 2 delta** (the changed set + its 1st/2nd-degree
+  `[[wikilink]]` neighbours): contradictions (apply the contradiction protocol), causal-chain gaps,
+  thin pages, missing cross-references. Run these **across the whole wiki only** when the user asked
+  for a full lint, or at a milestone such as just after a large bootstrap ingest.
+
+Fix what is fixable; log the rest, recording which scope ran.
 
 ## STEP 6 — Regenerate the MOC
 
@@ -136,8 +147,8 @@ Parse its `RESULT:{…}` line.
 ## STEP 7 — Log + commit
 
 - Append two `log.md` entries (append-only): `## [ts] causal-chain | compile pass (…)` and
-  `## [ts] lint | full lint pass (…)`, recording the model that ran, the triage decisions, and
-  every lint finding/fix.
+  `## [ts] lint | lint pass (scope: incremental|full) (…)`, recording the model that ran, the scope
+  and triage decisions, and every lint finding/fix.
 - Commit and push following your project's normal git practice. If the wiki tracks raw binaries with
   Git LFS and this commit added **new** ones, run `git lfs push --all origin` first; a chains+lint+MOC
   compile is normally text-only, so a plain `git push` suffices.
