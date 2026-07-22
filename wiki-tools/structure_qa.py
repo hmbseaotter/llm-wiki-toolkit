@@ -364,7 +364,13 @@ def check_causal_directions(repo, _pages):
 
 
 def check_duplicate_causal_targets(repo, _pages):
-    """The same target claimed twice in one causal section — usually one claim written twice.
+    """Two bullets to one target in one causal section that do not say how they differ.
+
+    NAMED FOR WHAT IT LOOKED LIKE, NOT WHAT IT FINDS. First full pass (2026-07-21) cleared 23
+    findings: 1 was a real duplicate, 22 were genuinely distinct edges whose distinguishing
+    condition was missing or buried after the direction token — luteal vs follicular, acute vs
+    chronic, onset vs maintenance, deficiency-end vs excess-end. So this is a CLARITY check, and
+    the usual fix is to make the condition visible, not to delete a bullet.
 
     SCOPE IS DELIBERATELY NARROW, because most repetition in this wiki is CORRECT:
       * Cross-page mirroring is the graph itself. `A — increase: B` belongs on A's `What this
@@ -408,12 +414,15 @@ def check_duplicate_causal_targets(repo, _pages):
                     out.append(_finding(
                         "duplicate-causal-target",
                         f"target {m.group(1).strip()!r} already has a bullet in this section "
-                        f"(line {seen[key]}) — likely one claim written twice",
+                        f"(line {seen[key]}) — two edges to one target that do not say "
+                        f"how they differ",
                         file=rel, line=i,
-                        fix="If both bullets make the same claim, merge them. If they are genuinely "
-                            "different edges (different mechanism, condition or direction), say so "
-                            "in each bullet's text, or separate them under `###` sub-headings so "
-                            "the distinction is visible to a reader as well as to this check."))
+                        fix="USUALLY these are two real edges whose distinguishing condition is "
+                            "missing or buried after the direction token — put it in the TARGET "
+                            "(`[[x]] (luteal) — decrease:`) or group them under `###` sub-headings. "
+                            "Merge only when both bullets genuinely make the same claim. If they "
+                            "differ because their SOURCES conflict, that is a contradiction, not a "
+                            "duplicate — flag it, do not merge (Hard Rule 7)."))
                 else:
                     seen[key] = i
     return out
