@@ -357,6 +357,50 @@ def check_causal_directions(repo, _pages):
     return out
 
 
+def check_line_endings(repo, _pages):
+    """A tracked markdown file whose working copy disagrees with .gitattributes.
+
+    `.gitattributes` declares `* text=auto eol=lf`, so git normalizes on staging and HISTORY can
+    never carry CRLF. This check exists for the working copy, where CRLF is not harmless: a
+    whole-file ending flip makes `git diff` and `git status` unreadable, which is how a real change
+    hides inside apparent noise.
+
+    WHY A CHECK RATHER THAN A RULE. Every agent in the 2026-07-21 session was told to write LF.
+    Behaviour was inconsistent anyway, three of them 'fixed' it three different ways, and two
+    produced contradictory diagnoses of the cause (the actual culprit was the Control Panel calling
+    write_text() without newline="", which Windows text mode translates). A prose instruction is
+    advisory and cannot be verified; this is recomputed every run and cannot be forgotten — the same
+    posture as the rest of this module."""
+    out = []
+    if not os.path.exists(os.path.join(repo, ".gitattributes")):
+        return out                                    # no declared convention -> nothing to enforce
+    for r, _, fs in os.walk(repo):
+        if ".git" in r.replace("\\", "/").split("/"):
+            continue
+        for fn in sorted(fs):
+            if not fn.endswith(".md"):
+                continue
+            p = os.path.join(r, fn)
+            rel = os.path.relpath(p, repo).replace("\\", "/")
+            if rel.startswith("raw/"):                # immutable and not ours to normalize
+                continue
+            try:
+                with open(p, "rb") as fh:
+                    blob = fh.read()
+            except OSError:
+                continue
+            if b"\r\n" in blob:
+                out.append(_finding(
+                    "crlf-line-endings",
+                    "working copy has CRLF endings but .gitattributes declares eol=lf — a "
+                    "whole-file ending flip makes real changes unreadable in git diff",
+                    file=rel,
+                    fix="Rewrite the file with LF (in Python: open(p, 'w', encoding='utf-8', "
+                        "newline='')). If a tool produced it, fix the tool — write_text() and "
+                        "print() translate \\n to \\r\\n on Windows unless newline='' is passed."))
+    return out
+
+
 def _contradiction_bullets(repo):
     """Yield (rel_path, line_no, bullet_lines) for every bullet under `## Contradictions flagged`.
 
@@ -468,7 +512,7 @@ def check_contradiction_blocks(repo, _pages):
 
 CHECKS = (check_duplicate_slugs, check_index_parity, check_stale_pending_pointers,
           check_broken_assets, check_causal_directions, check_causal_bullet_directions,
-          check_contradiction_blocks, check_unapplied_resolutions)
+          check_contradiction_blocks, check_unapplied_resolutions, check_line_endings)
 
 
 def scan_structure(repo=None):

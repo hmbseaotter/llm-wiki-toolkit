@@ -146,6 +146,16 @@ on, so they follow the delta instead.
   grep -rn "LLM assessment: PENDING" wiki/
   ```
 
+  **Before assessing, GO TO THE PRIMARY SOURCE.** You have web access here; the ingest model did
+  not. Locate each paper the conflicting claims cite (DOI / PMID / author-journal-year) and record its
+  actual design, sample, protocol and disputed figures in a `Primary source:` line on the block. Then
+  adjudicate each side as CORRECT or INCORRECT *against the paper*, not on plausibility. If a source
+  cannot be reached, say so explicitly — "not located" and "not checked" must never look alike. Sources
+  in these corpora routinely misstate the studies they cite, and that is invisible from the claims
+  alone. Finish every assessment with a required `Recommended resolution:` line: the human is choosing
+  between options, not redoing the investigation. See "Go to the primary source before assessing" in
+  `schema/contradictions.md`.
+
   Write a real assessment for every hit, then **confirm or OVERRIDE the provisional severity** against
   the schema's test (`hard` only when the two claims cannot both be true; two studies disagreeing is
   `soft`), and set `Last reviewed: <your model>, <ts>`. An escalation to `hard` blocks an automated
