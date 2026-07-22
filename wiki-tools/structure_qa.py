@@ -73,6 +73,7 @@ DIRECTIONS = {
     "initiate", "install", "intensify", "interrupt", "jam", "keep", "kill", "leave", "lengthen",
     "lift", "limit", "load", "loosen", "lower", "magnify", "maintain", "manufacture", "mask",
     "meet", "mis-signal", "misalign", "misattribute", "mislead", "miss", "mitigate", "moderate",
+    "no-effect",
     "multiply", "narrow", "normalize", "obscure", "open", "optimize", "oscillate", "overwhelm",
     "peak", "perpetuate", "persist", "precipitate", "predispose", "preserve", "prevent", "prime",
     "produce", "progress", "promote", "protect", "provide", "rate-limit", "reach", "reactivate",
@@ -85,6 +86,11 @@ DIRECTIONS = {
     "widen", "worsen",
 }
 
+# `no-effect` asserts a NON-effect ("X does not affect Y"). Added 2026-07-21 after the
+# vocabulary pass surfaced real cases — a sanctioned non-effect matters because "does NOT
+# chronically elevate cortisol" is often the clinically important claim, and rewriting it
+# positively loses that emphasis. It IS a direction (it states what happens to the target:
+# nothing), so it lives in DIRECTIONS rather than in the review-only set.
 # `other` is sanctioned by schema/page-format.md's own template as the honest "direction not
 # settled" escape hatch. It is NOT an error, but it is not traversable either, so it is reported
 # separately for review rather than counted as malformed.
