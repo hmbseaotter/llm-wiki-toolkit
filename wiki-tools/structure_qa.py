@@ -47,7 +47,74 @@ for _s in (sys.stdout, sys.stderr):
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # The sanctioned causal direction vocabulary (CLAUDE.md Hard Rule 8 / schema/causal.md).
-DIRECTIONS = {"increase", "decrease", "activate", "inhibit", "trigger", "suppress", "enable", "block"}
+# --- causal direction vocabulary -------------------------------------------------------------
+#
+# Hard Rule 8 originally named eight tokens. A 2026-07-21 census of all 4,693 causal bullets found
+# 314 distinct tokens in use, and the eight canonical ones covered only ~50% of them: `worsen` (200)
+# alone outranks five of the eight. The organic vocabulary is not sloppiness — `deplete` says more
+# than `decrease` in a nutrition context — so the schema was widened to match practice rather than
+# 2,100 bullets being flattened to eight words.
+#
+# DIRECTIONS is FROZEN, not open: it was generated once from (observed - rejected) and pasted here,
+# so a NEW coinage flags for review instead of being silently absorbed.
+DIRECTIONS = {
+    "accelerate", "accumulate", "achieve", "activate", "add", "address", "allow", "amplify",
+    "attenuate", "automate", "begin", "block", "blunt", "break", "build", "calibrate", "calm",
+    "cascade", "cause", "cease", "clear", "close", "co-provide", "collapse", "compete",
+    "complete", "compound", "compress", "consume", "contribute", "counterbalance", "crash",
+    "create", "cross", "damage", "dampen", "decline", "decrease", "deepen", "degrade", "delay",
+    "deliver", "deplete", "deprive", "desensitize", "destabilize", "destroy", "desynchronize",
+    "develop", "dim", "disengage", "disinhibit", "displace", "disrupt", "dissolve", "distort",
+    "divert", "drive", "drop", "dysregulate", "elevate", "eliminate", "enable", "encourage",
+    "enhance", "entrench", "erode", "escalate", "establish", "exacerbate", "exceed", "execute",
+    "exhaust", "expose", "extend", "facilitate", "fail", "fatigue", "feed", "fill", "flatten",
+    "flush", "force", "form", "fragment", "fuel", "fund", "garble", "gate", "generate", "harden",
+    "hide", "impair", "impede", "impose", "improve", "increase", "induce", "inflame", "inhibit",
+    "initiate", "install", "intensify", "interrupt", "jam", "keep", "kill", "leave", "lengthen",
+    "lift", "limit", "load", "loosen", "lower", "magnify", "maintain", "manufacture", "mask",
+    "meet", "mis-signal", "misalign", "misattribute", "mislead", "miss", "mitigate", "moderate",
+    "multiply", "narrow", "normalize", "obscure", "open", "optimize", "oscillate", "overwhelm",
+    "peak", "perpetuate", "persist", "precipitate", "predispose", "preserve", "prevent", "prime",
+    "produce", "progress", "promote", "protect", "provide", "rate-limit", "reach", "reactivate",
+    "recover", "redirect", "redistribute", "reduce", "refill", "reinforce", "release", "remain",
+    "remove", "repair", "replenish", "require", "reset", "resolve", "restart", "restore",
+    "retain", "reverse", "rise", "self-sustain", "sensitize", "sequester", "shift", "shrink",
+    "signal", "slow", "spike", "stabilize", "stall", "starve", "stimulate", "strengthen",
+    "stretch", "substitute", "supply", "support", "suppress", "surge", "sustain", "switch",
+    "time", "train", "transcribe", "trigger", "uncouple", "undermine", "upregulate", "weaken",
+    "widen", "worsen",
+}
+
+# `other` is sanctioned by schema/page-format.md's own template as the honest "direction not
+# settled" escape hatch. It is NOT an error, but it is not traversable either, so it is reported
+# separately for review rather than counted as malformed.
+UNKNOWN_DIRECTION = {"other"}
+
+# Why a token was rejected, so the finding can say something actionable instead of "not in list".
+REJECTED = {}
+for _t in ("abnormal absent acutely baseline biologically chronic chronically continuous "
+           "continuously delayed direct directly dramatic dual episodic erratic/premature falsely "
+           "far gradual heavy higher impaired inadequate indirect indirectly initial insufficient "
+           "irregular long multiple natural near-zero neurochemical not oxidative paradoxically "
+           "partial partially permanent post-pill potentially primary progressive rebound relative "
+           "severe short strong structural sustained systematically").split():
+    REJECTED[_t] = ("qualifier", "modifies a direction but is not one — the real direction is "
+                                 "missing or buried after it")
+for _t in ("absence deficiency double elevation fat fluctuation fluid insufficiency marker no "
+           "overactivity paradox progression receptor resistance result risk vacuum water").split():
+    REJECTED[_t] = ("noun", "names a state or the target itself, not the direction of effect")
+for _t in ("associate associated confirm correlate guide identify illustrate indicate indicates "
+           "link mimic predict represent").split():
+    REJECTED[_t] = ("epistemic", "asserts knowledge or correlation, not causation — a correlation "
+                                 "is not a causal edge")
+for _t in ("affect alter control converge determine express influence interact modulate occur "
+           "program regulate respond shape structure vary").split():
+    REJECTED[_t] = ("non-directional", "causal but direction-free: says THAT the target is affected, "
+                                       "never WHICH WAY it moves")
+for _t in ("does fills the when").split():
+    REJECTED[_t] = ("artifact", "not a direction token at all — the slot holds a function word or "
+                                "an inflected verb form")
+del _t
 
 # The fixed wording of a pending-pointer, per CLAUDE.md ("the pointer's wording is fixed so it stays
 # greppable"). A pointer is STALE once the slug it apologises for actually exists.
@@ -154,6 +221,102 @@ def check_broken_assets(repo, _pages):
                                             file=rel, line=i,
                                             fix="Fix the relative path (wiki pages sit two levels below "
                                                 "the root, so raw assets need ../../raw/…)."))
+    return out
+
+
+_CAUSAL_H2 = ("## what causes this", "## what this causes")
+_DASHES = ("—", "–")   # em, en
+
+
+def split_causal_bullet(line):
+    """`- [[target]] — <direction>: <mechanism>` -> (target, token, ok). ok=False if unparseable.
+
+    ORDER MATTERS, and both orderings were tried before this one stuck:
+      * scanning for the colon first breaks on a target carrying its own colon, e.g.
+        `**Food preference: high-calorie options** — increase (specifically): …`;
+      * taking the first em-dash regardless of nesting breaks on a target carrying its own dash,
+        e.g. `[[x]] (pre-existing — from restriction) — increase: …`, which silently yielded the
+        junk token "from".
+    So: collect separators and colons at bracket-depth 0 only, then take the first separator that
+    has a colon after it. Depth tracking is what keeps nested punctuation out of the slot."""
+    body = line[2:]
+    depth, seps, colons = 0, [], []
+    for i, c in enumerate(body):
+        if c in "([":
+            depth += 1
+        elif c in ")]":
+            depth = max(0, depth - 1)
+        elif depth == 0:
+            if c == ":":
+                colons.append(i)
+            elif (c in _DASHES and i > 0 and body[i - 1] == " "
+                  and i + 1 < len(body) and body[i + 1] == " "):
+                seps.append(i)
+    for s in seps:
+        colon = next((c for c in colons if c > s), None)
+        if colon is None:
+            continue
+        slot = body[s + 1:colon].strip().replace("*", "").strip()
+        if not slot:
+            continue
+        return body[:s].strip(), slot.split()[0].strip("(),").lower(), True
+    return None, None, False
+
+
+def check_causal_bullet_directions(repo, _pages):
+    """Hard Rule 8 on CONCEPT pages — where the overwhelming majority of causal edges actually live.
+
+    check_causal_directions (below) only ever scanned Links tables in wiki/causal-chains/, so Hard
+    Rule 8 was enforced on a small minority of edges. That gap is how `direction-inconsistent` — not
+    a direction token at all — sat unflagged in ashwagandha.md until a human resolution pass tripped
+    over it on 2026-07-21.
+
+    Reports three distinct outcomes, because they need different fixes:
+      * rejected token  -> the slot holds a qualifier / noun / epistemic / non-directional word
+      * unknown token   -> a coinage not in the frozen vocabulary; review and add or replace
+      * unparseable     -> the bullet does not have the mandatory `target — direction: mechanism`
+                           shape at all"""
+    out = []
+    for r, _, fs in os.walk(os.path.join(repo, "wiki")):
+        for fn in sorted(fs):
+            if not fn.endswith(".md"):
+                continue
+            p = os.path.join(r, fn)
+            rel = os.path.relpath(p, repo).replace("\\", "/")
+            in_causal = False
+            for i, line in enumerate(_read(p).split("\n"), 1):
+                if line.startswith("## "):
+                    in_causal = line.strip().lower().startswith(_CAUSAL_H2)
+                    continue
+                if not in_causal or not line.startswith("- "):
+                    continue
+                _, tok, ok = split_causal_bullet(line)
+                if not ok:
+                    out.append(_finding(
+                        "malformed-causal-bullet",
+                        "bullet is not in the mandatory `- [[target]] — <direction>: <mechanism>` "
+                        "form, so it is not a traversable causal edge",
+                        file=rel, line=i,
+                        fix="Rewrite to `- [[target]] — <direction>: <mechanism>`. If it is not a "
+                            "causal edge at all (a sub-list header, a cross-reference, an evidence "
+                            "note), move it to ## Related or out of the causal section."))
+                elif tok in REJECTED:
+                    kind, why = REJECTED[tok]
+                    out.append(_finding(
+                        "non-directional-token",
+                        f"direction slot holds '{tok}' ({kind}) — {why}",
+                        file=rel, line=i,
+                        fix="Replace with a token stating which way the target moves "
+                            "(schema/page-format.md, 'Mandatory format for causal bullets'). Use "
+                            "`other` only when the direction is genuinely unsettled."))
+                elif tok not in DIRECTIONS and tok not in UNKNOWN_DIRECTION:
+                    out.append(_finding(
+                        "unknown-direction-token",
+                        f"'{tok}' is not in the sanctioned direction vocabulary",
+                        file=rel, line=i,
+                        fix="Use an existing token, or — if this is a genuinely new and useful "
+                            "direction — add it to DIRECTIONS in tools/structure_qa.py and sync the "
+                            "copies. The vocabulary is frozen so coinages surface here for review."))
     return out
 
 
@@ -304,8 +467,8 @@ def check_contradiction_blocks(repo, _pages):
 
 
 CHECKS = (check_duplicate_slugs, check_index_parity, check_stale_pending_pointers,
-          check_broken_assets, check_causal_directions, check_contradiction_blocks,
-          check_unapplied_resolutions)
+          check_broken_assets, check_causal_directions, check_causal_bullet_directions,
+          check_contradiction_blocks, check_unapplied_resolutions)
 
 
 def scan_structure(repo=None):

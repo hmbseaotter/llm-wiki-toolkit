@@ -114,9 +114,15 @@ def _verdict(text):
     for neg in ("not a hard contradiction", "isn't a hard contradiction", "is not a hard contradiction",
                 "not a soft contradiction", "isn't a soft contradiction", "is not a soft contradiction"):
         t = t.replace(neg, "")
-    m = re.search(r"(?:contradiction\s+severity|classification):\s*(soft|hard|scope)", t)
-    if m:
-        return "hard" if m.group(1) == "hard" else "soft"
+    # The schema's machine-readable field wins outright. It must be searched on its OWN, ahead of the
+    # legacy `Classification:` alias — a single alternation would return whichever token appears first
+    # in the text, so a stale `Classification: soft` left in the assessment prose (assessments are
+    # never rewritten; see schema/contradictions.md) would shadow an `Contradiction severity: hard`
+    # escalation written below it and silently keep the entry out of the hard gate.
+    for rx in (r"contradiction\s+severity:\s*(soft|hard|scope)", r"classification:\s*(soft|hard|scope)"):
+        m = re.search(rx, t)
+        if m:
+            return "hard" if m.group(1) == "hard" else "soft"
     if "hard contradiction" in t:
         return "hard"
     if "soft contradiction" in t or "scope mismatch" in t or "scope contradiction" in t:
