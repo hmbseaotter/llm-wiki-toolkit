@@ -363,10 +363,11 @@ def check_causal_directions(repo, _pages):
     return out
 
 
-def check_duplicate_causal_targets(repo, _pages):
+def check_unstated_edge_conditions(repo, _pages):
     """Two bullets to one target in one causal section that do not say how they differ.
 
-    NAMED FOR WHAT IT LOOKED LIKE, NOT WHAT IT FINDS. First full pass (2026-07-21) cleared 23
+    RENAMED 2026-07-21 from `duplicate-causal-target`, which encoded a hypothesis its first full
+    pass disproved. First full pass (2026-07-21) cleared 23
     findings: 1 was a real duplicate, 22 were genuinely distinct edges whose distinguishing
     condition was missing or buried after the direction token — luteal vs follicular, acute vs
     chronic, onset vs maintenance, deficiency-end vs excess-end. So this is a CLARITY check, and
@@ -412,7 +413,7 @@ def check_duplicate_causal_targets(repo, _pages):
                 key = (section, sub, target)
                 if key in seen:
                     out.append(_finding(
-                        "duplicate-causal-target",
+                        "unstated-edge-condition",
                         f"target {m.group(1).strip()!r} already has a bullet in this section "
                         f"(line {seen[key]}) — two edges to one target that do not say "
                         f"how they differ",
@@ -584,7 +585,7 @@ def check_contradiction_blocks(repo, _pages):
 CHECKS = (check_duplicate_slugs, check_index_parity, check_stale_pending_pointers,
           check_broken_assets, check_causal_directions, check_causal_bullet_directions,
           check_contradiction_blocks, check_unapplied_resolutions, check_line_endings,
-          check_duplicate_causal_targets)
+          check_unstated_edge_conditions)
 
 
 def scan_structure(repo=None):
