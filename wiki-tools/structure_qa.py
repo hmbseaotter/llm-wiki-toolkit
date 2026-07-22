@@ -363,6 +363,62 @@ def check_causal_directions(repo, _pages):
     return out
 
 
+def check_duplicate_causal_targets(repo, _pages):
+    """The same target claimed twice in one causal section — usually one claim written twice.
+
+    SCOPE IS DELIBERATELY NARROW, because most repetition in this wiki is CORRECT:
+      * Cross-page mirroring is the graph itself. `A — increase: B` belongs on A's `What this
+        causes` AND B's `What causes this`; that is what makes traversal work from either end.
+        Never flag it.
+      * A repeated target under DIFFERENT `###` sub-headings is usually two real edges about two
+        different subjects — e.g. estriol-vs-estradiol.md states `VTE risk` once under
+        "Estradiol replacement" and once under "Estriol replacement". So the sub-heading is part
+        of the key; without it this check would flag correct pages.
+
+    What it CANNOT see, and what actually cost us on 2026-07-21: the same mechanism stated once as
+    prose in `## How it works` and again as a bullet, in completely different words. No string
+    match reaches that — it is reasoning work, and `schema/lint.md` carries it as a lint-pass rule
+    instead. This check covers only the mechanical half; do not mistake a clean run for an absence
+    of redundancy."""
+    out = []
+    for r, _, fs in os.walk(os.path.join(repo, "wiki")):
+        for fn in sorted(fs):
+            if not fn.endswith(".md"):
+                continue
+            p = os.path.join(r, fn)
+            rel = os.path.relpath(p, repo).replace("\\", "/")
+            section, sub, seen = None, "", {}
+            for i, line in enumerate(_read(p).split("\n"), 1):
+                if line.startswith("## "):
+                    low = line.strip().lower()
+                    section = low if low.startswith(_CAUSAL_H2) else None
+                    sub = ""
+                    continue
+                if line.startswith("### "):
+                    sub = line.strip()
+                    continue
+                if not section or not line.startswith("- "):
+                    continue
+                m = re.match(r"-\s+(.*?)\s+[—–]\s", line)
+                if not m:
+                    continue
+                target = m.group(1).strip().lower().replace("*", "").strip()
+                key = (section, sub, target)
+                if key in seen:
+                    out.append(_finding(
+                        "duplicate-causal-target",
+                        f"target {m.group(1).strip()!r} already has a bullet in this section "
+                        f"(line {seen[key]}) — likely one claim written twice",
+                        file=rel, line=i,
+                        fix="If both bullets make the same claim, merge them. If they are genuinely "
+                            "different edges (different mechanism, condition or direction), say so "
+                            "in each bullet's text, or separate them under `###` sub-headings so "
+                            "the distinction is visible to a reader as well as to this check."))
+                else:
+                    seen[key] = i
+    return out
+
+
 def check_line_endings(repo, _pages):
     """A tracked markdown file whose working copy disagrees with .gitattributes.
 
@@ -518,7 +574,8 @@ def check_contradiction_blocks(repo, _pages):
 
 CHECKS = (check_duplicate_slugs, check_index_parity, check_stale_pending_pointers,
           check_broken_assets, check_causal_directions, check_causal_bullet_directions,
-          check_contradiction_blocks, check_unapplied_resolutions, check_line_endings)
+          check_contradiction_blocks, check_unapplied_resolutions, check_line_endings,
+          check_duplicate_causal_targets)
 
 
 def scan_structure(repo=None):
