@@ -33,6 +33,10 @@ anything to compile **before** invoking any Opus reasoning. There is work to do 
 2. **Lint deltas** (cheap shell checks):
    - missing pages: `comm -23 <(grep -rhoE '\[\[[^]#|]+' wiki index.md | sed 's/^\[\[//' | grep -v '^raw/' | sort -u) <(find wiki -name '*.md' -exec basename {} .md \; | sort -u)` — compare against the known-accepted forward-link set recorded in the last compile/lint log entry; only *new* ones count.
    - stale pending-pointers: any `*(page pending — closest coverage: …)*` whose wanted slug now has a file.
+   - **unapplied resolutions**: `python tools/structure_qa.py` reporting `unapplied-resolution` — a
+     human resolved a contradiction and the decision never reached the page prose. This one is *always*
+     dirty-making and must never be scoped away: nothing else in the system will ever chase it (see
+     STEP 5).
    - MOC drift: re-run the MOC generator (deterministic/idempotent), then test with
      `git diff --ignore-all-space --quiet home-page.md` — a **non-zero exit means real content drift**
      (the MOC was stale). Do **not** judge drift with plain `git status`: on Windows the generator
@@ -147,6 +151,32 @@ on, so they follow the delta instead.
   `soft`), and set `Last reviewed: <your model>, <ts>`. An escalation to `hard` blocks an automated
   commit and summons the user — that is correct, and is the whole reason this step exists. A PENDING
   assessment anywhere in the wiki is unfinished work, so this one ignores the delta scoping below.
+- **Unapplied resolutions — repo-wide, never scoped, and the highest-value work in this step.** When a
+  human resolves a contradiction (through a control panel, or by hand), typically only the
+  `Status: Resolved — <note>` line is written: no prose is edited and no model is called. But the note is
+  routinely a *directive* ("disregard that figure", "mark this as an error", "this framing should be
+  primary"). And the instant `Status:` stops being `Unresolved`, the block leaves the commit gate, the
+  aging report and any nag or review queue simultaneously — `Resolved` is a **terminal state**, so an
+  unapplied resolution is chased by nothing else, ever.
+
+  ```bash
+  python tools/structure_qa.py    # reports these as `unapplied-resolution`
+  ```
+
+  For each hit, follow **Applying a resolution** in the wiki's `schema/contradictions.md`: read the note
+  as an instruction addressed to the page text, edit the *body* so it obeys (never `raw/` — Hard Rule 1;
+  a resolution corrects the wiki's rendering of a source, never the source), leave the contradiction
+  block itself intact as the permanent record, and write the `Applied:` record with one `·` entry per
+  edit, each anchored to its **section heading** and carrying the verbatim `−`/`+` text. Where nothing
+  needed changing, write `Applied: none required — <why>` — "nothing was needed" and "nobody looked" must
+  never be indistinguishable. Never let the edit silently settle a *different* open contradiction
+  (Hard Rule 7).
+
+  Two reasons this cannot be deferred or scoped: `## Contradictions flagged` sits at the **bottom** of
+  every page, so a reader who stops after "How it works" never learns the human's decision was made; and
+  when this check was first written, a real corpus was found to have **no application record on any of
+  its 15 resolved contradictions** — one page had spent weeks teaching the exact framing the human had
+  explicitly demoted.
 - **Reasoning-heavy checks, scoped to the STEP 2 delta** (the changed set + its 1st/2nd-degree
   `[[wikilink]]` neighbours): contradictions already assessed (re-check only if the delta touches
   them), causal-chain gaps, thin pages, missing cross-references. Run these **across the whole wiki

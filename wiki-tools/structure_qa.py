@@ -194,8 +194,118 @@ def check_causal_directions(repo, _pages):
     return out
 
 
+def _contradiction_bullets(repo):
+    """Yield (rel_path, line_no, bullet_lines) for every bullet under `## Contradictions flagged`.
+
+    Shared by the two contradiction checks below. Kept as ONE parser deliberately: on 2026-07-21
+    contradiction_qa.py was found to have drifted 100-116 lines across four copies, and two
+    hand-maintained copies of this bullet-walk would rot the same way."""
+    for r, _, fs in os.walk(os.path.join(repo, "wiki")):
+        for fn in sorted(fs):
+            if not fn.endswith(".md"):
+                continue
+            p = os.path.join(r, fn)
+            rel = os.path.relpath(p, repo).replace("\\", "/")
+            lines = _read(p).split("\n")
+            start = next((i for i, l in enumerate(lines) if l.strip() == "## Contradictions flagged"), None)
+            if start is None:
+                continue
+            end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
+            section = lines[start + 1:end]
+            bullets, cur = [], None
+            for k, l in enumerate(section):
+                if l.startswith("- "):
+                    if cur is not None:
+                        bullets.append(cur)
+                    cur = [start + 2 + k, [l]]
+                elif cur is not None:
+                    cur[1].append(l)
+            if cur is not None:
+                bullets.append(cur)
+            for line_no, body in bullets:
+                if "\n".join(body).strip("- ").strip():
+                    yield rel, line_no, body
+
+
+def check_unapplied_resolutions(repo, _pages):
+    """A resolved contradiction whose decision never reached the page prose.
+
+    The human resolves a contradiction in the Control Panel with a note that is routinely a DIRECTIVE
+    ("disregard the tablespoon figure", "this should be marked as an error", "the depletion framing
+    should be primary"). The panel writes only the `Status:` line — it edits no prose and calls no
+    model. And the moment Status stops being `Unresolved`, contradiction_qa skips the block, so it
+    leaves the gate, the aging report, the nag and the panel queue simultaneously.
+
+    `Resolved` is therefore a TERMINAL state, and an unapplied resolution is chased by nothing. This
+    check is the only thing standing between a human decision and silent oblivion. Found on
+    2026-07-21: all 15 resolved contradictions lacked any application record, and sugar-withdrawal.md
+    still taught the framing the human had explicitly demoted five weeks earlier.
+
+    See `schema/contradictions.md`, 'Applying a resolution'."""
+    out = []
+    for rel, line_no, body in _contradiction_bullets(repo):
+        # Only `Resolved` needs application. `Acknowledged` is a deliberate park (the conflict stands
+        # as tentative and the prose is meant to keep both readings), and `Unresolved` is covered by
+        # the severity gate.
+        if not any(re.match(r"Status:\s*Resolved\b", l.strip()) for l in body):
+            continue
+        # Require a line that STARTS with the marker — resolution notes themselves often contain the
+        # word "applied" in prose ("the directional correction has been applied to the Gotchas
+        # section"), which must not be mistaken for the machine-readable record.
+        if any(l.strip().startswith("Applied:") for l in body):
+            continue
+        out.append(_finding(
+            "unapplied-resolution",
+            "contradiction is marked Resolved but carries no `Applied:` record — the human's "
+            "resolution may never have reached the page prose, and nothing else will ever chase it",
+            file=rel, line=line_no,
+            fix="Read the resolution note as an instruction addressed to the page text, edit the "
+                "body so it obeys (raw/ is never touched), then add the `Applied:` record with one "
+                "`.` entry per edit anchored to its section heading and carrying the verbatim "
+                "removed/added text. If genuinely nothing needed changing, record "
+                "`Applied: none required - <why>` so 'nothing was needed' and 'nobody looked' stay "
+                "distinguishable (schema/contradictions.md, 'Applying a resolution')."))
+    return out
+
+
+def check_contradiction_blocks(repo, _pages):
+    """A flagged contradiction missing its required lines is INVISIBLE to the gate.
+
+    contradiction_qa keys off `Status: Unresolved`; the aging report and the severity gate key off
+    `Contradiction severity:`. So a block that states a conflict but omits those lines exists for a
+    human reader and for nobody else — it cannot block a commit, cannot age, cannot reach the nag,
+    and does not appear in the control panel. Found on 2026-07-21: reference-range-trap.md's ferritin
+    bullet had a conflict written out with no assessment, no severity and no status at all.
+
+    Checked per bullet inside a `## Contradictions flagged` section. A bullet with a Status of
+    Resolved/Acknowledged is complete by definition and only needs its severity token."""
+    out = []
+    for rel, line_no, body in _contradiction_bullets(repo):
+        # causal-chain pages use the INLINE contradiction form documented in
+        # schema/page-format.md ("- **A vs B:** claims. Contradiction severity: … Status: …"),
+        # which carries no separate `LLM assessment` line. Requiring one there is a false
+        # positive against the schema's own format, not a defect.
+        is_chain = "/causal-chains/" in rel
+        required = [("severity", r"[Cc]ontradiction severity:"), ("status", r"Status:")]
+        if not is_chain:
+            required.insert(0, ("assessment", r"LLM assessment"))
+        txt = "\n".join(body)
+        missing = [name for name, pat in required if not re.search(pat, txt)]
+        if missing:
+            out.append(_finding(
+                "incomplete-contradiction",
+                "flagged contradiction is missing: " + ", ".join(missing)
+                + " — it is invisible to the severity gate and the aging report",
+                file=rel, line=line_no,
+                fix="Add the missing line(s). Every flagged contradiction needs an "
+                    "LLM assessment, a `Contradiction severity:` token and a `Status:` line "
+                    "(schema/contradictions.md, 'How to flag a contradiction')."))
+    return out
+
+
 CHECKS = (check_duplicate_slugs, check_index_parity, check_stale_pending_pointers,
-          check_broken_assets, check_causal_directions)
+          check_broken_assets, check_causal_directions, check_contradiction_blocks,
+          check_unapplied_resolutions)
 
 
 def scan_structure(repo=None):
