@@ -15,9 +15,11 @@ Opus reasoning if there is nothing to compile.
 
 ## Model
 
-Causal-chain construction and lint are reasoning-heavy — the schema routes them to **`claude-opus-4-8`**.
+Causal-chain construction and lint are reasoning-heavy — the schema routes them to the **Opus model
+named in its Model selection table** (the wiki's `CLAUDE.md`). Read the id from there; wikis migrate
+at different times, so this skill names none.
 - If the current session is already on Opus, run inline (Model-selection routing rule 3).
-- If not, dispatch the build+lint work to a subagent with `model: claude-opus-4-8`, or tell the user
+- If not, dispatch the build+lint work to a subagent with that Opus model as `model`, or tell the user
   to `/model` up. Never run the synthesis/lint on a model chosen only for ingestion.
 - STEP 0 (the dirty-check) is pure shell — run it on any model.
 
